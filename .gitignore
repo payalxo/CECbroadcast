@@ -23,3 +23,10 @@ lerna-debug.log*
 *.sln
 *.sw?
 .DS_Store
+
+# secrets: never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
