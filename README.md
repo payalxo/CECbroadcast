@@ -1,129 +1,83 @@
-# 🏢 Chaibasa Engineering College Civil Dept — AI Digital Twin Dashboard
+# CEC Broadcast: Fire and Earthquake Alerts for a Building Digital Twin
 
-[![Live Dashboard Demo](https://img.shields.io/badge/Live%20Demo-View%20Digital%20Twin-00d4ff?style=for-the-badge&logo=googlechrome)](https://devendragupta-BIM.github.io/CEC-civil-department-virtual-digital-twin-dashboard/)
-[![Published in Automation in Construction](https://img.shields.io/badge/Published-Automation%20in%20Construction%20(Elsevier)-00d4ff?style=for-the-badge&logo=elsevier)](https://www.sciencedirect.com/journal/automation-in-construction)
-[![Building](https://img.shields.io/badge/Building-Chaibasa%20Engineering%20College-00ff88?style=for-the-badge)](https://www.chaibasaengg.edu.in/)
-[![University](https://img.shields.io/badge/University-JUT%20Ranchi-8855ff?style=for-the-badge)](https://jutranchi.ac.in/)
+A monitoring and alert system for a college building. A Python server simulates sensors, detects fire and earthquake events, sends **Telegram alerts** to a phone, and drives a **3D dashboard** where the affected floor glows red (fire) or orange (earthquake).
 
-> 🌐 **Live Public Web Link**: [https://devendragupta-BIM.github.io/CEC-civil-department-virtual-digital-twin-dashboard/](https://devendragupta-BIM.github.io/CEC-civil-department-virtual-digital-twin-dashboard/)
+> **Status: working prototype.** All sensor data is **simulated**. This is a learning and demo project. It is not a safety system and does not replace real fire alarms.
 
-Created & Developed by **Devendra Gupta** — BIM Automation Consultant at BMSI, Gurugram.
+## What this project adds
 
----
+The 3D dashboard (React + Three.js) comes from another student's project (see Credits). The parts added in this repository are:
 
-## 🌐 Live Online Access (Shareable Link)
+- **`alert_server/server.py`**: a Python server (standard library only) that
+  - simulates smoke, temperature and vibration readings for three floors,
+  - detects **fire** when smoke and temperature are both high (two signals together, so one faulty sensor doesn't trigger it),
+  - detects **earthquakes** by comparing recent shaking (last 3 seconds) to normal shaking (last 30 seconds), instead of using a fixed threshold,
+  - sends Telegram alerts (with retries if the connection is slow),
+  - shares live readings at `http://localhost:8000/data`.
+- **`alert_server/send_alert.py`**: sends a message through a Telegram bot.
+- **`src/context/SensorContext.jsx`** (modified): the dashboard asks the server for readings every second and adds fire and earthquake alerts to the alert feed. If the server is not running, it falls back to the original random demo data.
+- **`src/components/BuildingModel.jsx`** (modified): a translucent overlay makes the affected floor glow red or orange.
 
-You can share this live web link with anyone (professors, researchers, students, or clients) to view and interact with the 3D Digital Twin directly in their browser without downloading anything:
+## How it works
 
-👉 **[https://devendragupta-BIM.github.io/CEC-civil-department-virtual-digital-twin-dashboard/](https://devendragupta-BIM.github.io/CEC-civil-department-virtual-digital-twin-dashboard/)**
-
----
-
-## 🔰 How to Run Locally (Step-by-Step Guide for Beginners)
-
-If you want to run the project on your local computer:
-
-### 📋 Prerequisites (Only needed once)
-First, make sure you have **Node.js** installed on your computer:
-1. Download Node.js (LTS Version) from: 👉 **[https://nodejs.org/](https://nodejs.org/)**
-2. Run the installer and click **Next** until installation finishes.
-
----
-
-### Option A: Using Git Clone (Recommended)
-
-#### Step 1: Open Terminal / Command Prompt
-- On **Windows**: Press `Win + R`, type `cmd`, and press **Enter**.
-- On **Mac**: Press `Cmd + Space`, type `Terminal`, and press **Enter**.
-
-#### Step 2: Clone the Repository
-Copy and paste this command into your terminal, then press **Enter**:
-```bash
-git clone https://github.com/devendragupta-BIM/CEC-civil-department-virtual-digital-twin-dashboard.git
+```
+server.py (simulated sensors + fire/earthquake rules)
+   |-- Telegram bot --> alert on your phone
+   '-- /data (JSON) --> React dashboard --> alert feed + glowing floors
 ```
 
-#### Step 3: Enter the Project Folder
-Type this command and press **Enter**:
-```bash
-cd CEC-civil-department-virtual-digital-twin-dashboard
+## Run it locally
+
+You need Node.js, Python 3 and Git.
+
+**1. Create a Telegram bot.** Message `@BotFather` on Telegram, send `/newbot`, and keep the token it gives you private. Send any message to your new bot, then open `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` to find your chat ID.
+
+**2. Start the alert server** (Windows):
+
+```
+cd alert_server
+set TELEGRAM_TOKEN=your_token_here
+set TELEGRAM_CHAT_ID=your_chat_id_here
+python server.py
 ```
 
-#### Step 4: Install Required Packages
-Type this command and press **Enter**:
-```bash
+The token is read from the environment and is never stored in the code. If it isn't set, the server still runs and only prints the alerts.
+
+**3. Start the dashboard** (in a second terminal, from the project root):
+
+```
 npm install
-```
-
-#### Step 5: Start the Dashboard!
-Type this command and press **Enter**:
-```bash
 npm run dev
 ```
 
-#### Step 6: View in Your Browser
-Open Chrome, Edge, Safari, or Firefox and go to:
-👉 **`http://localhost:3000/`**
+Open `http://localhost:3000`.
 
----
+## Try it
 
-### Option B: Download as ZIP File (No Git Required)
+Wait about 15 seconds after starting the server (the earthquake detector needs a little history), then open these in your browser:
 
-1. Click the green **`Code`** button at the top right of this GitHub page.
-2. Select **`Download ZIP`**.
-3. Unzip/Extract the downloaded folder onto your Desktop or computer.
-4. Open your **Command Prompt** or **Terminal**.
-5. Type `cd ` (with a space) and drag & drop the unzipped folder into the terminal window, then press **Enter**.
-6. Run:
-   ```bash
-   npm install
-   ```
-7. Run:
-   ```bash
-   npm run dev
-   ```
-8. Open your browser to: 👉 **`http://localhost:3000/`**
+| Address | What happens |
+|---|---|
+| `http://localhost:8000/fire/2` | Starts a fire on the second floor. Within about 10 seconds the floor glows red and Telegram sends an alert |
+| `http://localhost:8000/quake` | Simulates an 8-second earthquake on all floors (orange) |
+| `http://localhost:8000/reset` | Clears all alarms |
+| `http://localhost:8000/data` | Shows the current readings as JSON |
 
-🎉 **That's it!** The 3D rotating building and live AI dashboard will appear on your screen!
+## Limitations
 
----
+- Sensors are simulated. Real hardware (for example an ESP32 with a smoke sensor and an accelerometer) is not connected yet.
+- The dashboard talks to `localhost:8000`, so it currently works only on the same computer. Deployment is not done yet.
+- Earthquakes are **detected as they happen**, not predicted.
 
-## 🌟 Highlights & Features
+## Roadmap
 
-- **3D Procedural BIM Model**: Faithfully recreated in Three.js from Autodesk Revit & Navisworks (`CIVIL DEPARTMENT CEC 01.nwc`), featuring G+2 floors, cream facade with red horizontal band courses, 4 projecting corner towers with top apertures, double window wings, and entrance portico signage.
-- **25 Simulated IoT Data Streams**: Live environmental monitoring across 3 floors + MEP systems (Temperature, Humidity, CO2, Occupancy, Energy Load, Noise, and Structural Vibration) updating every 2.5 seconds.
-- **AI Anomaly Detection Engine**: Isolation Forest ML simulation flagging real-time indoor air quality (CO2 spikes up to 1600 ppm) and thermal variances.
-- **Natural Language AI Query Bar**: Ask questions in plain English (e.g., *"Which floor has highest CO2?"*, *"What is total energy load?"*).
-- **Cinematic Glassmorphism UI**: NASA mission-control dark theme (`#040810`), real-time Chart.js energy trend graph, dynamic SVG building health score arc (0–100), alert popups, and scanline overlay.
+- [ ] Connect real sensors (ESP32 with smoke and acceleration sensors)
+- [ ] Deploy the server and dashboard online
+- [ ] Store readings over time
+- [ ] Add real earthquake data from the USGS API
 
----
+## Credits
 
-## 🎮 How to Interact with the Dashboard
+The 3D digital twin dashboard is based on the work of **Devendra Gupta**: [CEC civil department virtual digital twin dashboard](https://github.com/devendragupta-BIM/CEC-civil-department-virtual-digital-twin-dashboard). Its README states the MIT License.
 
-- **Rotate & Zoom 3D Building**: Click and drag your mouse anywhere on the 3D canvas to rotate the building. Use your mouse scroll wheel to zoom in or out.
-- **Switch Floor Views**: Click any floor button on the left sidebar (**Ground Floor**, **First Floor**, **Second Floor**) to move the camera and view that specific floor's live sensor cards.
-- **Change Camera Angle**: Use the top-left buttons on the 3D canvas (**3D View**, **Floor Plan**, **Front Elevation**, or **Pause**).
-- **Ask AI Questions**: Click the **"Ask AI"** input box at the bottom right, type a question like `Which floor has highest CO2?`, and press Enter to receive an instant AI report.
-
----
-
-## 🛠️ Technology Stack
-
-- **Core**: React 18 + Vite
-- **3D Graphics**: Three.js + `@react-three/fiber` + `@react-three/drei`
-- **Styling**: Vanilla CSS tokens + Tailwind CSS + Glassmorphism Backdrop Blurs
-- **Charts**: Chart.js + `react-chartjs-2`
-- **Icons**: Lucide React
-
----
-
-## 👨‍💻 Author Profile
-
-**Devendra Gupta**
-* BIM Automation Consultant | BMSI, Gurugram
-* Specialization: BIM + AI Integration, IoT Digital Twins, Revit Automation & Computational Design
-* Email: [devendragupta.bim@gmail.com](mailto:devendragupta.bim@gmail.com)
-* GitHub: [@devendragupta-BIM](https://github.com/devendragupta-BIM)
-
----
-
-*Chaibasa Engineering College, Jharkhand University of Technology (JUT), Ranchi · 2025*
+Alert server, alert rules, Telegram integration and dashboard connection by **payalxo**.
