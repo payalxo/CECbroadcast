@@ -37,6 +37,17 @@ function CECBuilding({ cameraView, isPaused }) {
 
   return (
     <group ref={buildingGroup} position={[0, -4, 0]}>
+      {/* ALARM OVERLAY: floor glows red (fire) or orange (earthquake) */}
+      {[0, 1, 2].map((i) => {
+        const s = floors[i]?.status;
+        if (s !== 'fire' && s !== 'quake') return null;
+        return (
+          <mesh key={`alarm-${i}`} position={[0, [2, 6.5, 11][i], 0]}>
+            <boxGeometry args={[37, 4.3, 15]} />
+            <meshBasicMaterial color={s === 'fire' ? '#ff1a1a' : '#ff9900'} transparent opacity={0.55} />
+          </mesh>
+        );
+      })}
       {/* GROUND PLANE & CAMPUS LAWN */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]}>
         <planeGeometry args={[100, 100]} />
