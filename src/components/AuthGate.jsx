@@ -37,19 +37,19 @@ export default function AuthGate({ children }) {
     else setPassword('');
   };
 
-  const page = 'min-h-screen flex items-center justify-center bg-gradient-to-b from-[#040810] via-[#070e1c] to-[#040810] p-4';
+  const page = 'aurora relative overflow-hidden min-h-screen flex items-center justify-center bg-gradient-to-b from-[#040810] via-[#070e1c] to-[#040810] p-4';
 
   if (checking) {
-    return <div className={page}><p className="text-slate-400 text-sm">Loading…</p></div>;
+    return <div className={page}><p className="relative z-10 text-slate-400 text-sm">Loading…</p></div>;
   }
   if (session) return children;
 
-  const input = 'w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-400/60';
+  const input = 'w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-slate-500 outline-none transition focus:border-cyan-400/60 focus:bg-white/10';
 
   return (
     <div className={page}>
-      <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
-        <h1 className="text-xl font-semibold text-white">Campus Twin</h1>
+      <div className="rise relative z-10 w-full max-w-sm rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
+        <h1 className="gradient-text text-2xl font-bold">Campus Twin</h1>
         <p className="mb-6 mt-1 text-sm text-slate-400">Operator sign-in</p>
         <form onSubmit={signIn} className="space-y-4">
           <input type="email" autoComplete="username" placeholder="Email" value={email}
@@ -58,7 +58,7 @@ export default function AuthGate({ children }) {
             onChange={(e) => setPassword(e.target.value)} className={input} />
           {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
           <button type="submit" disabled={busy}
-            className="w-full rounded-xl bg-cyan-500/90 py-3 text-sm font-medium text-[#040810] transition hover:bg-cyan-400 disabled:opacity-50">
+            className="lift w-full rounded-xl bg-cyan-500/90 py-3 text-sm font-medium text-[#040810] hover:bg-cyan-400 disabled:opacity-50">
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
