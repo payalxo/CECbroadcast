@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-
+import { authedFetch } from '../lib/api';
 const SensorContext = createContext();
 
 export const initialFloorData = [
@@ -31,7 +31,7 @@ export function SensorProvider({ children }) {
   useEffect(() => {
     const poll = async () => {
       try {
-        const res = await fetch('http://localhost:8000/data');
+        const res = await authedFetch('/data');
         const data = await res.json();
         serverOnline.current = true;
         const timestamp = new Date().toTimeString().split(' ')[0];

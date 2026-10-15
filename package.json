@@ -15,6 +15,7 @@
   "dependencies": {
     "@react-three/drei": "^9.112.0",
     "@react-three/fiber": "^8.17.8",
+    "@supabase/supabase-js": "^2.117.3",
     "chart.js": "^4.4.4",
     "clsx": "^2.1.1",
     "lucide-react": "^0.439.0",

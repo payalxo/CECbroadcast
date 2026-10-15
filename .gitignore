@@ -30,3 +30,5 @@ lerna-debug.log*
 !.env.example
 *.pem
 *.key
+__pycache__/
+*.pyc

@@ -1,19 +1,134 @@
 import json
+import os
 import random
 import threading
 import time
-from collections import deque
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import urllib.request
+from collections import defaultdict, deque
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 try:
     from send_alert import send_alert
 except KeyError:
     def send_alert(text):
-        print("(Telegram token not set) would have sent:", text)
+        print("(Telegram settings missing) would have sent a message")
+
+# ---------- Settings (all come from the environment, never from this file) ----------
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+PUBLISHABLE_KEY = os.environ.get("SUPABASE_PUBLISHABLE_KEY", "")
+SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
+ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "http://localhost:3000")
+HOST = os.environ.get("HOST", "127.0.0.1")
+PORT = int(os.environ.get("PORT", "8000"))
+TRUST_PROXY = os.environ.get("TRUST_PROXY", "0") == "1"
 
 FLOOR_IDS = (0, 1, 2)
 NAMES = {0: "Ground Floor", 1: "First Floor", 2: "Second Floor"}
+TOKEN_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.")
 
+
+# ---------- Rate limiting ----------
+class RateLimiter:
+    def __init__(self, limit, window):
+        self.limit = limit
+        self.window = window
+        self.hits = defaultdict(deque)
+        self.lock = threading.Lock()
+
+    def _prune(self, key, now):
+        q = self.hits[key]
+        while q and q[0] <= now - self.window:
+            q.popleft()
+        return q
+
+    def allow(self, key):
+        now = time.time()
+        with self.lock:
+            q = self._prune(key, now)
+            if len(q) >= self.limit:
+                return False
+            q.append(now)
+            if len(self.hits) > 5000:
+                for k in [k for k, v in self.hits.items() if not v]:
+                    del self.hits[k]
+            return True
+
+    def blocked(self, key):
+        with self.lock:
+            return len(self._prune(key, time.time())) >= self.limit
+
+    def hit(self, key):
+        with self.lock:
+            self._prune(key, time.time()).append(time.time())
+
+
+general_limiter = RateLimiter(120, 60)   # any request: 120 per minute per address
+control_limiter = RateLimiter(10, 60)    # drills: 10 per minute per address
+failed_logins = RateLimiter(10, 300)     # bad logins: 10 per 5 minutes per address
+
+
+# ---------- Login check (done on the server, by asking Supabase) ----------
+token_cache = {}
+cache_lock = threading.Lock()
+
+
+def token_is_valid(token):
+    if not token or len(token) > 4096 or not set(token) <= TOKEN_CHARS:
+        return False
+    now = time.time()
+    with cache_lock:
+        if token_cache.get(token, 0) > now:
+            return True
+    if not SUPABASE_URL or not PUBLISHABLE_KEY:
+        return False
+    request = urllib.request.Request(
+        f"{SUPABASE_URL}/auth/v1/user",
+        headers={"apikey": PUBLISHABLE_KEY, "Authorization": f"Bearer {token}"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            ok = response.status == 200
+    except Exception:
+        ok = False
+    if ok:
+        with cache_lock:
+            if len(token_cache) > 500:
+                token_cache.clear()
+            token_cache[token] = now + 30   # remember a good token for 30 seconds
+    return ok
+
+
+# ---------- Saving alerts to the database ----------
+def save_alert(floor_id, kind, message):
+    if not SUPABASE_URL or not SECRET_KEY:
+        return
+    if floor_id not in FLOOR_IDS or kind not in ("fire", "quake"):
+        return
+    body = json.dumps({"floor_id": floor_id, "kind": kind, "message": message[:200]}).encode()
+    headers = {"apikey": SECRET_KEY, "Content-Type": "application/json", "Prefer": "return=minimal"}
+    if SECRET_KEY.startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {SECRET_KEY}"
+    request = urllib.request.Request(f"{SUPABASE_URL}/rest/v1/alerts", data=body, headers=headers, method="POST")
+    urllib.request.urlopen(request, timeout=8).close()
+
+
+def notify(telegram_text, floor_id, kind, db_text):
+    try:
+        send_alert(telegram_text)
+    except Exception as error:
+        print("Telegram failed:", type(error).__name__)
+    try:
+        save_alert(floor_id, kind, db_text)
+    except Exception as error:
+        print("Saving alert failed:", type(error).__name__)
+
+
+def alert(telegram_text, floor_id, kind, db_text):
+    print("ALERT:", db_text)
+    threading.Thread(target=notify, args=(telegram_text, floor_id, kind, db_text), daemon=True).start()
+
+
+# ---------- Simulated sensors and detection rules ----------
 lock = threading.Lock()
 floors = {i: {"name": NAMES[i], "temperature": 28.0, "smoke": 30,
               "vibration": 0.03, "status": "ok"} for i in FLOOR_IDS}
@@ -23,18 +138,6 @@ history = {i: deque(maxlen=30) for i in FLOOR_IDS}
 fire_alerted = set()
 quake_until = 0.0
 quake_alerted = False
-
-
-def safe_send(text):
-    try:
-        send_alert(text)
-    except Exception as error:
-        print("Could not send Telegram message:", error)
-
-
-def alert(text):
-    print("ALERT:", text)
-    threading.Thread(target=safe_send, args=(text,)).start()
 
 
 def tick():
@@ -67,12 +170,20 @@ def tick():
             f["status"] = "fire"
             if fid not in fire_alerted:
                 fire_alerted.add(fid)
-                alert(f"🔥 FIRE on {f['name']}! smoke={f['smoke']}, temp={f['temperature']}C")
+                alert(
+                    f"🔥 FIRE on {f['name']}! smoke={f['smoke']}, temp={f['temperature']}C",
+                    fid, "fire",
+                    f"Fire on {f['name']}: smoke {f['smoke']}, temperature {f['temperature']}C",
+                )
         elif quake_on and (quake_detected or f["status"] == "quake"):
             f["status"] = "quake"
             if not quake_alerted:
                 quake_alerted = True
-                alert(f"🌍 EARTHQUAKE detected! shaking is {ratio:.1f}x normal")
+                alert(
+                    f"🌍 EARTHQUAKE detected! shaking is {ratio:.1f}x normal",
+                    fid, "quake",
+                    f"Earthquake detected: shaking {ratio:.1f}x normal",
+                )
         else:
             f["status"] = "ok"
 
@@ -93,33 +204,126 @@ def reset():
     quake_alerted = False
 
 
+# ---------- The web server ----------
 class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        global quake_until
-        parts = self.path.split("?")[0].strip("/").split("/")
-        message = "ok"
-        with lock:
-            if parts[0] == "fire" and len(parts) == 2 and parts[1].isdigit() and int(parts[1]) in FLOOR_IDS:
-                fire_on[int(parts[1])] = True
-                message = f"fire started on floor {parts[1]}"
-            elif parts[0] == "quake":
-                quake_until = time.time() + 8
-                message = "earthquake started (lasts 8 seconds)"
-            elif parts[0] == "reset":
-                reset()
-                message = "everything reset"
-            body = json.dumps({"message": message, "floors": floors}).encode()
-        self.send_response(200)
+    timeout = 10           # drop slow or stuck connections
+    server_version = "Twin"
+    sys_version = ""
+
+    def client_ip(self):
+        if TRUST_PROXY:
+            forwarded = self.headers.get("X-Forwarded-For", "")
+            if forwarded:
+                return forwarded.split(",")[-1].strip()
+        return self.client_address[0]
+
+    def safe_headers(self):
+        self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
+        self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+        self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+
+    def reply(self, status, payload):
+        body = json.dumps(payload).encode()
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(body)))
+        self.safe_headers()
         self.end_headers()
         self.wfile.write(body)
+
+    def allowed_through(self, ip):
+        if len(self.path) > 200:
+            self.reply(414, {"error": "address too long"})
+            return False
+        if int(self.headers.get("Content-Length", "0") or 0) > 1024:
+            self.reply(413, {"error": "request too large"})
+            return False
+        if not general_limiter.allow(ip):
+            self.reply(429, {"error": "too many requests"})
+            return False
+        return True
+
+    def logged_in(self, ip):
+        if failed_logins.blocked(ip):
+            self.reply(429, {"error": "too many failed attempts, try later"})
+            return False
+        header = self.headers.get("Authorization", "")
+        token = header[7:].strip() if header.startswith("Bearer ") else ""
+        if not token_is_valid(token):
+            failed_logins.hit(ip)
+            self.reply(401, {"error": "unauthorized"})
+            return False
+        return True
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.safe_headers()
+        self.end_headers()
+
+    def do_GET(self):
+        ip = self.client_ip()
+        if not self.allowed_through(ip):
+            return
+        path = self.path.split("?")[0].strip("/")
+        if path == "health":
+            self.reply(200, {"status": "ok"})
+            return
+        if path == "data":
+            if not self.logged_in(ip):
+                return
+            with lock:
+                trimmed = {
+                    str(i): {k: floors[i][k] for k in ("name", "temperature", "smoke", "vibration", "status")}
+                    for i in FLOOR_IDS
+                }
+            self.reply(200, {"floors": trimmed})
+            return
+        self.reply(404, {"error": "not found"})
+
+    def do_POST(self):
+        global quake_until
+        ip = self.client_ip()
+        if not self.allowed_through(ip):
+            return
+        if not self.logged_in(ip):
+            return
+        if not control_limiter.allow(ip):
+            self.reply(429, {"error": "too many drills, slow down"})
+            return
+        parts = self.path.split("?")[0].strip("/").split("/")
+        with lock:
+            if len(parts) == 3 and parts[:2] == ["control", "fire"] and parts[2] in ("0", "1", "2"):
+                fire_on[int(parts[2])] = True
+                message = f"fire drill started on floor {parts[2]}"
+            elif parts == ["control", "quake"]:
+                quake_until = time.time() + 8
+                message = "earthquake drill started (8 seconds)"
+            elif parts == ["control", "reset"]:
+                reset()
+                message = "all alarms cleared"
+            else:
+                message = None
+        if message is None:
+            self.reply(404, {"error": "not found"})
+        else:
+            self.reply(200, {"message": message})
 
     def log_message(self, *args):
         pass
 
 
 if __name__ == "__main__":
+    needed = ["SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY"]
+    missing = [name for name in needed if not os.environ.get(name)]
+    if missing:
+        print("Missing settings:", ", ".join(missing))
     threading.Thread(target=loop, daemon=True).start()
-    print("Server running. Open http://localhost:8000/data  (Ctrl+C to stop)")
-    HTTPServer(("127.0.0.1", 8000), Handler).serve_forever()
+    print(f"Server running on {HOST}:{PORT}")
+    ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
