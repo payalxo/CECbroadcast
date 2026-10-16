@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { authedFetch } from '../lib/api';
+
 const SensorContext = createContext();
 
 export const initialFloorData = [
@@ -9,7 +10,7 @@ export const initialFloorData = [
   { id: 3, name: 'Electrical DB', subLabel: 'Main DB · UPS · Backup Gen', code: 'MEP-E', temperature: 29.5, humidity: 45, co2: 420, occupancy: 2, energy: 18.2, noise: 58, vibration: 0.25, lux: 300 },
   { id: 4, name: 'Plumbing & Water', subLabel: 'OHT · Pump Room · Drainage', code: 'MEP-P', temperature: 23.0, humidity: 78, co2: 450, occupancy: 1, energy: 8.5, noise: 52, vibration: 0.42, lux: 250 },
   { id: 5, name: 'Ventilation HVAC', subLabel: 'Exhaust · Air handlers · Ducting', code: 'MEP-V', temperature: 25.5, humidity: 50, co2: 510, occupancy: 0, energy: 12.1, noise: 68, vibration: 0.31, lux: 350 },
-  { id: 6, name: 'AI Engine', subLabel: 'Isolation Forest · Anomaly Detection', code: 'AI-SYS', temperature: 21.0, humidity: 40, co2: 400, occupancy: 0, energy: 3.2, noise: 32, vibration: 0.05, lux: 400 },
+  { id: 6, name: 'Basement & Utility', subLabel: 'Storage · Service Area', code: 'BASE', temperature: 21.0, humidity: 40, co2: 400, occupancy: 0, energy: 3.2, noise: 32, vibration: 0.05, lux: 400 }
 ];
 
 export function SensorProvider({ children }) {
@@ -37,35 +38,37 @@ export function SensorProvider({ children }) {
         const timestamp = new Date().toTimeString().split(' ')[0];
 
         setFloors(prev => prev.map(f => {
-          const live = data.floors[String(f.id)];
+          const live = data.floors?.[String(f.id)];
           if (!live) return f;
-          // co2 is fixed at 600 because we have no CO2 sensor yet
           return { ...f, temperature: live.temperature, smoke: live.smoke, vibration: live.vibration, status: live.status, co2: 600 };
         }));
 
-        Object.entries(data.floors).forEach(([id, live]) => {
-          const before = lastStatus.current[id] || 'ok';
-          if (live.status !== 'ok' && before === 'ok') {
-            const isFire = live.status === 'fire';
-            const alertObj = {
-              id: Date.now() + Number(id),
-              time: timestamp,
-              floor: live.name,
-              type: isFire ? 'FIRE' : 'EARTHQUAKE',
-              level: 'critical',
-              msg: isFire
-                ? `Fire detected on ${live.name}: smoke ${live.smoke}, temperature ${live.temperature}°C`
-                : `Strong shaking detected on ${live.name}`
-            };
-            setAlerts(prevAlerts => [alertObj, ...prevAlerts.slice(0, 15)]);
-            setLatestPopup(alertObj);
-          }
-          lastStatus.current[id] = live.status;
-        });
+        if (data.floors) {
+          Object.entries(data.floors).forEach(([id, live]) => {
+            const before = lastStatus.current[id] || 'ok';
+            if (live.status !== 'ok' && before === 'ok') {
+              const isFire = live.status === 'fire';
+              const alertObj = {
+                id: Date.now() + Number(id),
+                time: timestamp,
+                floor: live.name || `Floor ${id}`,
+                type: isFire ? 'FIRE' : 'EARTHQUAKE',
+                level: 'critical',
+                msg: isFire
+                  ? `Fire detected on ${live.name || `Floor ${id}`}: smoke ${live.smoke}, temperature ${live.temperature}°C`
+                  : `Strong shaking detected on ${live.name || `Floor ${id}`}`
+              };
+              setAlerts(prevAlerts => [alertObj, ...prevAlerts.slice(0, 15)]);
+              setLatestPopup(alertObj);
+            }
+            lastStatus.current[id] = live.status;
+          });
+        }
       } catch (e) {
         serverOnline.current = false;
       }
     };
+
     poll();
     const timer = setInterval(poll, 1000);
     return () => clearInterval(timer);
@@ -79,16 +82,13 @@ export function SensorProvider({ children }) {
       const timestamp = new Date().toTimeString().split(' ')[0];
 
       setFloors(prevFloors => {
-        return prevFloors.map(floor => {
+        const updatedFloors = prevFloors.map(floor => {
           if (floor.id === 2) {
-            const newCo2 = Math.floor(1350 + Math.random() * 250);
-            const newTemp = Number((31.0 + Math.random() * 3).toFixed(1));
-            const newEnergy = Number((24 + Math.random() * 5).toFixed(1));
             return {
               ...floor,
-              co2: newCo2,
-              temperature: newTemp,
-              energy: newEnergy,
+              co2: Math.floor(1350 + Math.random() * 250),
+              temperature: Number((31.0 + Math.random() * 3).toFixed(1)),
+              energy: Number((24 + Math.random() * 5).toFixed(1)),
               humidity: Math.floor(52 + Math.random() * 10),
               occupancy: Math.floor(32 + Math.random() * 8),
               noise: Math.floor(52 + Math.random() * 12),
@@ -112,12 +112,12 @@ export function SensorProvider({ children }) {
             };
           }
         });
-      });
 
-      setFloors(currentFloors => {
-        const totalKW = currentFloors.reduce((acc, f) => acc + f.energy, 0);
+        // Update energy history cleanly without nested state setters
+        const totalKW = updatedFloors.reduce((acc, f) => acc + f.energy, 0);
         setEnergyHistory(prev => [...prev.slice(1), Number(totalKW.toFixed(1))]);
-        return currentFloors;
+
+        return updatedFloors;
       });
 
       if (Math.random() > 0.6) {
@@ -128,7 +128,7 @@ export function SensorProvider({ children }) {
           floor: 'Second Floor',
           type: 'High CO2 Anomaly',
           level: 'critical',
-          msg: `Isolation Forest flagged CO2 spike (${newCo2Val} ppm) in 2F Classroom 204`
+          msg: `Demo data (server offline): CO2 spike (${newCo2Val} ppm) in 2F Classroom 204`
         };
         setAlerts(prev => [alertObj, ...prev.slice(0, 15)]);
         setLatestPopup(alertObj);
@@ -166,15 +166,19 @@ export function SensorProvider({ children }) {
       return `🌡️ **Thermal Inspection**: ${hottestFloor.name} recorded highest temperature of **${hottestFloor.temperature}°C**. Ambient HVAC setpoint calibration is recommended.`;
     }
     if (q.includes('energy') || q.includes('power') || q.includes('load') || q.includes('kw')) {
-      return `⚡ **Power Demand**: Total building electrical load is **${totalEnergy} kW**. Highest consumption is observed in **${[...floors].sort((a,b)=>b.energy-a.energy)[0].name}** at **${[...floors].sort((a,b)=>b.energy-a.energy)[0].energy} kW**.`;
+      const maxEnergyFloor = [...floors].sort((a, b) => b.energy - a.energy)[0];
+      return `⚡ **Power Demand**: Total building electrical load is **${totalEnergy} kW**. Highest consumption is observed in **${maxEnergyFloor.name}** at **${maxEnergyFloor.energy} kW**.`;
     }
     if (q.includes('occup') || q.includes('people') || q.includes('student') || q.includes('headcount')) {
-      return `👥 **Occupancy Count**: Current active building headcount is **${totalOccupancy} occupants** across all 3 floors (GF: ${floors[0].occupancy}, 1F: ${floors[1].occupancy}, 2F: ${floors[2].occupancy}).`;
+      const gfOcc = floors.find(f => f.id === 0)?.occupancy ?? 0;
+      const f1Occ = floors.find(f => f.id === 1)?.occupancy ?? 0;
+      const f2Occ = floors.find(f => f.id === 2)?.occupancy ?? 0;
+      return `👥 **Occupancy Count**: Current active building headcount is **${totalOccupancy} occupants** across all 3 floors (GF: ${gfOcc}, 1F: ${f1Occ}, 2F: ${f2Occ}).`;
     }
     if (q.includes('alert') || q.includes('anomaly') || q.includes('risk') || q.includes('health')) {
       return `🛡️ **Health & Integrity**: Overall building health score is **${healthScore}/100**. ${criticalCount} Critical and ${warningCount} Warning anomalies active. Primary driver: Second Floor CO2 accumulation.`;
     }
-    return `🤖 **BIM AI Agent**: Chaibasa Engineering College Civil Dept digital twin active. Sensors: 25 live streams. Structural integrity nominal. High CO2 anomaly detected on 2F Classrooms. Ask about CO2, Temperature, Energy, or Headcount!`;
+    return `🤖 Building assistant: Live telemetry active across building subsystems and sensory data streams. Structural integrity nominal. High CO2 anomaly detected on 2F Classrooms. Ask about CO2, Temperature, Energy, or Headcount!`;
   };
 
   return (

@@ -82,7 +82,7 @@ export default function ControlPanel() {
       </div>
 
       {/* Control panel */}
-      <div className={`rise fixed left-72 top-36 z-40 w-72 max-h-[70vh] overflow-y-auto rounded-3xl p-4 ${glass}`}>
+      <div className={`rise fixed right-[316px] top-20 z-40 w-72 max-h-[70vh] overflow-y-auto rounded-3xl p-4 ${glass}`}>
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-white">Control panel</p>
           <div className="flex gap-2">

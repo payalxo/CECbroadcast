@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber'; import CameraRig from './CameraRig';
 import { OrbitControls, Text, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useSensor } from '../context/SensorContext';
@@ -24,8 +24,8 @@ function CECBuilding({ cameraView, isPaused }) {
 
   // Continuous subtle rotation & scan beam movement
   useFrame((state, delta) => {
-    if (buildingGroup.current && !isPaused) {
-      buildingGroup.current.rotation.y += 0.002;
+    if (buildingGroup.current && (cameraView !== 0 || !isPaused)) {
+      buildingGroup.current.rotation.y += cameraView === 0 ? 0.002 : (Math.round(buildingGroup.current.rotation.y / (2 * Math.PI)) * 2 * Math.PI - buildingGroup.current.rotation.y) * 0.08;
     }
 
     // Scan beam animation
@@ -266,7 +266,7 @@ function CECBuilding({ cameraView, isPaused }) {
       {[
         { id: 0, y: 2, status: f0Status, labels: ['GF-01 Reception', 'GF-02 HOD Office', 'GF-03 Staff Room'] },
         { id: 1, y: 6.5, status: f1Status, labels: ['1F-01 Struct Lab', '1F-02 Concrete Lab', '1F-03 Corridor'] },
-        { id: 2, y: 11, status: f2Status, labels: ['2F-01 Class 201', '2F-02 Classroom 204 (CO2 HIGH)', '2F-03 Computer Lab'] }
+        { id: 2, y: 11, status: f2Status, labels: ['2F-01 Class 201', '2F-02 Classroom 204', '2F-03 Computer Lab'] }
       ].map((floorSensors) => (
         <group key={`sensors-floor-${floorSensors.id}`}>
           {[-11, 0, 11].map((xOffset, sIdx) => {
@@ -286,7 +286,7 @@ function CECBuilding({ cameraView, isPaused }) {
                 </mesh>
 
                 {/* Html Sensor Data Hover Tag */}
-                <Html position={[0, 0.6, 0]} center distanceFactor={25}>
+                <Html position={[0, 0.6, 0]} center distanceFactor={25} zIndexRange={[10, 0]}>
                   <div className="px-2 py-0.5 rounded text-[10px] font-mono whitespace-nowrap bg-[#040810]/80 backdrop-blur border border-cyan-500/40 text-cyan-300 shadow-lg pointer-events-none">
                     <span className="w-1.5 h-1.5 rounded-full inline-block mr-1" style={{ backgroundColor: nodeColor }}></span>
                     {floorSensors.labels[sIdx]}
@@ -336,7 +336,7 @@ export default function BuildingModel({ cameraPreset, isPaused }) {
         <pointLight position={[-20, 15, 20]} intensity={0.6} color="#00d4ff" />
         <pointLight position={[20, 15, -20]} intensity={0.5} color="#0066ff" />
 
-        {/* 3D BUILDING MODEL */}
+        <CameraRig preset={cameraPreset} positions={cameraPositions} />
         <CECBuilding cameraView={cameraPreset} isPaused={isPaused} />
 
         {/* SMOOTH ORBIT CONTROLS */}

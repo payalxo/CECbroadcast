@@ -3,10 +3,10 @@ import { ShieldCheck, Cpu, Database, Activity, Layers, Radio } from 'lucide-reac
 
 const loadingSteps = [
   'Connecting to IoT sensor network...',
-  'Loading BIM 3D geometry from Revit...',
-  'Initializing AI anomaly detection...',
+'Loading the 3D building model...',
+  'Initializing fire and earthquake rules...',
   'Calibrating real-time IoT data streams...',
-  'Running Isolation Forest ML model...',
+  'Starting fire and earthquake detection...',
   'Chaibasa Engineering College Digital Twin online.'
 ];
 
@@ -68,20 +68,20 @@ export default function LoadingScreen({ onComplete }) {
         </div>
 
         {/* Title */}
-        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-300 bg-clip-text text-transparent mb-2 drop-shadow-sm">
-          CHAIBASA ENGG COLLEGE — CIVIL DEPT
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight whitespace-nowrap bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-400 bg-clip-text text-transparent drop-shadow-sm mb-2">
+          CHAIBASA ENGINEERING COLLEGE
         </h1>
         <h2 className="text-lg font-semibold text-cyan-400 tracking-wider mb-2">
-          AI DIGITAL TWIN DASHBOARD
+          CAMPUS TWIN · FIRE &amp; EARTHQUAKE MONITORING
         </h2>
 
-        {/* Subtitle & Credits */}
-        <p className="text-xs text-slate-400 tracking-wide mb-8 max-w-md">
-          Department of Civil Engineering · Jharkhand University of Technology (JUT), Ranchi
-          <span className="block text-cyan-300/80 font-medium mt-1">
-            Modeled & Built by Devendra Gupta · BIM Automation Consultant at BMSI, Gurugram
-          </span>
-        </p>
+       {/* Subtitle & Credits */}
+       <p className="text-xs text-slate-400 tracking-wide mb-8 max-w-xl mx-auto text-center leading-relaxed">
+          Department of Civil Engineering | Jharkhand University of Technology (JUT), Ranchi
+           <span className="block text-cyan-300/80 font-medium mt-2">
+             3D Dashboard: Devendra Gupta • Alerts & Security: Payal Kumari Mahato
+           </span>
+       </p>
 
         {/* Progress Bar Container */}
         <div className="w-full bg-[#070d1a] p-1 rounded-full border border-cyan-500/20 shadow-inner mb-4 relative overflow-hidden">
@@ -103,7 +103,7 @@ export default function LoadingScreen({ onComplete }) {
         {/* Publication Credential Badge */}
         <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 backdrop-blur text-[11px] text-slate-300 flex items-center space-x-2">
           <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>Published in <strong className="text-white">Automation in Construction (Elsevier)</strong></span>
+          <span>Fire &amp; earthquake monitoring demo</span>
         </div>
       </div>
     </div>

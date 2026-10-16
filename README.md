@@ -80,4 +80,4 @@ Wait about 15 seconds after starting the server (the earthquake detector needs a
 
 The 3D digital twin dashboard is based on the work of **Devendra Gupta**: [CEC civil department virtual digital twin dashboard](https://github.com/devendragupta-BIM/CEC-civil-department-virtual-digital-twin-dashboard). Its README states the MIT License.
 
-Alert server, alert rules, Telegram integration and dashboard connection by **payalxo**.
+Alert server, alert rules, Telegram integration and dashboard connection by **Payal Kumari Mahato**.

@@ -1,130 +1,112 @@
 import React from 'react';
 import { useSensor } from '../context/SensorContext';
-import {
-  Building2,
-  FlaskConical,
-  Ruler,
-  Zap,
-  Droplets,
-  Wind,
-  Brain,
-  Activity,
-  AlertCircle,
-  Thermometer,
-  CloudRain,
-  Users,
-  Shield
-} from 'lucide-react';
+import { Building2, FlaskConical, Ruler, Zap, Droplets, Wind, Activity, Shield } from 'lucide-react';
 
 const zoneIcons = [
-  <Building2 className="w-4 h-4 text-cyan-400" />,
-  <FlaskConical className="w-4 h-4 text-blue-400" />,
-  <Ruler className="w-4 h-4 text-amber-400" />,
-  <Zap className="w-4 h-4 text-yellow-400" />,
-  <Droplets className="w-4 h-4 text-emerald-400" />,
-  <Wind className="w-4 h-4 text-sky-400" />,
-  <Brain className="w-4 h-4 text-purple-400" />
+  <Building2 className="h-4 w-4 text-cyan-400" />,
+  <FlaskConical className="h-4 w-4 text-blue-400" />,
+  <Ruler className="h-4 w-4 text-amber-400" />,
+  <Zap className="h-4 w-4 text-yellow-400" />,
+  <Droplets className="h-4 w-4 text-emerald-400" />,
+  <Wind className="h-4 w-4 text-sky-400" />,
 ];
 
-export default function LeftSidebar() {
-  const {
-    selectedFloorId,
-    setSelectedFloorId,
-    floors,
-    criticalCount,
-    warningCount,
-    avgTemp,
-    avgCo2,
-    totalOccupancy,
-    totalEnergy
-  } = useSensor();
+const dotFor = (status) =>
+  status === 'fire'
+    ? 'bg-rose-500 animate-ping shadow-[0_0_10px_#ff3355]'
+    : status === 'quake'
+    ? 'bg-orange-400 animate-ping shadow-[0_0_10px_#fb923c]'
+    : 'bg-emerald-400 shadow-[0_0_8px_#00ff88]';
 
-  const totalAlerts = criticalCount + warningCount;
+export default function LeftSidebar() {
+  const { selectedFloorId, setSelectedFloorId, floors } = useSensor();
+
+  const live = floors.filter((f) => f.id <= 2);
+  const planned = floors.filter((f) => f.id > 2 && f.id <= 5);
+
+  const alarms = live.filter((f) => f.status === 'fire' || f.status === 'quake').length;
+  const hottest = Math.max(...live.map((f) => f.temperature));
+  const smokePeak = Math.max(...live.map((f) => f.smoke || 0));
+  const shakePeak = Math.max(...live.map((f) => f.vibration || 0));
+
+  const card = 'rounded-lg border border-white/5 bg-white/5 p-2';
+  const label = 'block text-[9px] uppercase text-slate-400';
 
   return (
-    <aside className="w-[220px] h-[calc(100vh-56px)] bg-[#070d1a]/80 backdrop-blur-md border-r border-cyan-500/15 p-3 flex flex-col justify-between overflow-y-auto z-40 select-none">
+    <aside className="z-40 flex h-[calc(100vh-56px)] w-[220px] select-none flex-col justify-between overflow-y-auto border-r border-white/10 bg-[#070d1a]/70 p-3 backdrop-blur-xl">
       <div>
-        {/* SECTION LABEL: BUILDING ZONES */}
-        <div className="flex items-center space-x-1.5 mb-2 px-1">
-          <Activity className="w-3.5 h-3.5 text-cyan-400" />
-          <h2 className="text-[11px] font-bold text-slate-400 tracking-wider uppercase">BUILDING ZONES</h2>
+        <div className="mb-2 flex items-center space-x-1.5 px-1">
+          <Activity className="h-3.5 w-3.5 text-cyan-400" />
+          <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Building zones</h2>
         </div>
 
-        {/* FLOOR BUTTONS LIST (7 TOTAL) */}
-        <div className="space-y-1.5 mb-6">
-          {floors.map((floor, idx) => {
+        {/* Zones with sensors */}
+        <div className="mb-3 space-y-1.5">
+          {live.map((floor, idx) => {
             const isSelected = selectedFloorId === floor.id;
-            // Status dot calculation
-            let dotColor = 'bg-emerald-400 shadow-[0_0_8px_#00ff88]';
-            if (floor.id === 2 || (floor.co2 > 1300)) {
-              dotColor = 'bg-rose-500 animate-ping shadow-[0_0_10px_#ff3355]';
-            } else if (floor.temperature > 30 || floor.co2 > 1000) {
-              dotColor = 'bg-amber-400 shadow-[0_0_8px_#ffaa00]';
-            }
-
             return (
               <button
                 key={floor.id}
                 onClick={() => setSelectedFloorId(floor.id)}
-                className={`w-full text-left p-2.5 rounded-xl transition-all duration-200 border flex items-start space-x-2.5 relative group ${
+                className={`lift flex w-full items-start space-x-2.5 rounded-xl border p-2.5 text-left ${
                   isSelected
-                    ? 'bg-cyan-500/15 border-cyan-400/60 text-white shadow-[0_0_15px_rgba(0,212,255,0.15)]'
-                    : 'bg-white/5 border-transparent text-slate-300 hover:bg-white/10 hover:border-cyan-500/20'
+                    ? 'border-cyan-400/60 bg-cyan-500/15 text-white shadow-[0_0_15px_rgba(34,211,238,0.15)]'
+                    : 'border-transparent bg-white/5 text-slate-300 hover:border-cyan-500/20 hover:bg-white/10'
                 }`}
               >
-                <div className="mt-0.5 p-1 rounded-lg bg-black/40 border border-white/5">
-                  {zoneIcons[idx]}
-                </div>
-                <div className="flex-1 min-w-0">
+                <div className="mt-0.5 rounded-lg border border-white/5 bg-black/40 p-1">{zoneIcons[idx]}</div>
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold truncate leading-tight">{floor.name}</span>
-                    <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+                    <span className="truncate text-xs font-semibold leading-tight">{floor.name}</span>
+                    <span className={`h-2 w-2 rounded-full ${dotFor(floor.status)}`} />
                   </div>
-                  <p className="text-[10px] text-slate-400 truncate mt-0.5 leading-tight">{floor.subLabel}</p>
+                  <p className="mt-0.5 truncate text-[10px] leading-tight text-slate-400">{floor.subLabel}</p>
                 </div>
               </button>
             );
           })}
         </div>
 
-        {/* SECTION LABEL: BUILDING SUMMARY */}
-        <div className="flex items-center space-x-1.5 mb-2 px-1">
-          <Shield className="w-3.5 h-3.5 text-cyan-400" />
-          <h2 className="text-[11px] font-bold text-slate-400 tracking-wider uppercase">BUILDING SUMMARY</h2>
+        {/* Zones without sensors */}
+        <p className="mb-1 px-1 text-[9px] uppercase tracking-wider text-slate-500">No sensors yet</p>
+        <div className="mb-6 space-y-1.5">
+          {planned.map((floor, idx) => (
+            <div key={floor.id} className="flex items-center space-x-2.5 rounded-xl border border-transparent bg-white/[0.03] p-2 opacity-50">
+              <div className="rounded-lg border border-white/5 bg-black/40 p-1">{zoneIcons[idx + 3]}</div>
+              <span className="truncate text-xs text-slate-400">{floor.name}</span>
+            </div>
+          ))}
         </div>
 
-        {/* MINI METRIC CARDS (2 PER ROW) */}
+        <div className="mb-2 flex items-center space-x-1.5 px-1">
+          <Shield className="h-3.5 w-3.5 text-cyan-400" />
+          <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Building summary</h2>
+        </div>
+
         <div className="grid grid-cols-2 gap-1.5">
-          <div className="p-2 rounded-lg bg-white/5 border border-white/5">
-            <span className="text-[9px] text-slate-400 block uppercase">Total Sensors</span>
-            <span className="text-sm font-bold font-mono text-cyan-300">25</span>
+          <div className={card}>
+            <span className={label}>Floors monitored</span>
+            <span className="font-mono text-sm font-bold text-cyan-300">{live.length}</span>
           </div>
-
-          <div className="p-2 rounded-lg bg-white/5 border border-white/5">
-            <span className="text-[9px] text-slate-400 block uppercase">Active Alerts</span>
-            <span className={`text-sm font-bold font-mono ${totalAlerts > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-              {totalAlerts}
-            </span>
+          <div className={card}>
+            <span className={label}>Active alarms</span>
+            <span className={`font-mono text-sm font-bold ${alarms > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{alarms}</span>
           </div>
-
-          <div className="p-2 rounded-lg bg-white/5 border border-white/5">
-            <span className="text-[9px] text-slate-400 block uppercase">Avg Temp</span>
-            <span className="text-xs font-bold font-mono text-amber-300">{avgTemp}°C</span>
+          <div className={card}>
+            <span className={label}>Hottest</span>
+            <span className="font-mono text-xs font-bold text-amber-300">{hottest}°C</span>
           </div>
-
-          <div className="p-2 rounded-lg bg-white/5 border border-white/5">
-            <span className="text-[9px] text-slate-400 block uppercase">Avg CO2</span>
-            <span className="text-xs font-bold font-mono text-rose-300">{avgCo2} ppm</span>
+          <div className={card}>
+            <span className={label}>Smoke peak</span>
+            <span className="font-mono text-xs font-bold text-sky-300">{smokePeak}</span>
           </div>
-
-          <div className="p-2 rounded-lg bg-white/5 border border-white/5">
-            <span className="text-[9px] text-slate-400 block uppercase">Occupancy</span>
-            <span className="text-xs font-bold font-mono text-cyan-300">{totalOccupancy}</span>
+          <div className={card}>
+            <span className={label}>Shaking peak</span>
+            <span className="font-mono text-xs font-bold text-purple-300">{shakePeak} g</span>
           </div>
-
-          <div className="p-2 rounded-lg bg-white/5 border border-white/5">
-            <span className="text-[9px] text-slate-400 block uppercase">Energy</span>
-            <span className="text-xs font-bold font-mono text-yellow-300">{totalEnergy} kW</span>
+          <div className={card}>
+            <span className={label}>Data</span>
+            <span className="font-mono text-xs font-bold text-amber-300">Simulated</span>
           </div>
         </div>
       </div>
