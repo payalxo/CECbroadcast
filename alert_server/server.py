@@ -63,7 +63,7 @@ class RateLimiter:
             self._prune(key, time.time()).append(time.time())
 
 
-general_limiter = RateLimiter(120, 60)   # any request: 120 per minute per address
+general_limiter = RateLimiter(int(os.environ.get("RATE_LIMIT_PER_MIN", "600")), 60)   # any request: 120 per minute per address
 control_limiter = RateLimiter(10, 60)    # drills: 10 per minute per address
 failed_logins = RateLimiter(10, 300)     # bad logins: 10 per 5 minutes per address
 
@@ -253,7 +253,7 @@ class Handler(BaseHTTPRequestHandler):
         if TRUST_PROXY:
             forwarded = self.headers.get("X-Forwarded-For", "")
             if forwarded:
-                return forwarded.split(",")[-1].strip()
+                return ([p.strip() for p in forwarded.split(",") if p.strip()] or [self.client_address[0]])[-2:][0]
         return self.client_address[0]
 
     def safe_headers(self):
@@ -350,8 +350,8 @@ class Handler(BaseHTTPRequestHandler):
                 fire_on[int(parts[2])] = True; floors[int(parts[2])]["smoke"] = 180; floors[int(parts[2])]["temperature"] = 31.0
                 message = f"fire drill started on floor {parts[2]}"
             elif parts == ["control", "quake"]:
-                quake_until = time.time() + 8
-                message = "earthquake drill started (8 seconds)"
+                quake_until = time.time() + 15
+                message = "earthquake drill started (15 seconds)"
             elif parts == ["control", "reset"]:
                 reset()
                 message = "all alarms cleared"
