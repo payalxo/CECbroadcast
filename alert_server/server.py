@@ -21,6 +21,7 @@ ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "http://localhost:3000")
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "8000"))
 TRUST_PROXY = os.environ.get("TRUST_PROXY", "0") == "1"
+ESCALATE_AFTER = int(os.environ.get("ESCALATE_AFTER", "60"))   # seconds
 
 FLOOR_IDS = (0, 1, 2)
 NAMES = {0: "Ground Floor", 1: "First Floor", 2: "Second Floor"}
@@ -128,6 +129,15 @@ def alert(telegram_text, floor_id, kind, db_text):
     threading.Thread(target=notify, args=(telegram_text, floor_id, kind, db_text), daemon=True).start()
 
 
+def telegram_only(text):
+    def run():
+        try:
+            send_alert(text)
+        except Exception as error:
+            print("Telegram failed:", type(error).__name__)
+    threading.Thread(target=run, daemon=True).start()
+
+
 # ---------- Simulated sensors and detection rules ----------
 lock = threading.Lock()
 floors = {i: {"name": NAMES[i], "temperature": 28.0, "smoke": 30,
@@ -139,9 +149,14 @@ fire_alerted = set()
 quake_until = 0.0
 quake_alerted = False
 
+# Emergency tracking: when it started, whether the operator acknowledged, whether we escalated
+emergency_since = None
+acknowledged = False
+escalated = False
+
 
 def tick():
-    global quake_alerted
+    global quake_alerted, emergency_since, acknowledged, escalated
     quake_on = time.time() < quake_until
     if not quake_on:
         quake_alerted = False
@@ -187,6 +202,27 @@ def tick():
         else:
             f["status"] = "ok"
 
+    # --- emergency tracking and escalation ---
+    active = [fid for fid in FLOOR_IDS if floors[fid]["status"] != "ok"]
+    now = time.time()
+    if not active:
+        emergency_since = None
+        acknowledged = False
+        escalated = False
+    elif emergency_since is None:
+        emergency_since = now
+        acknowledged = False
+        escalated = False
+    elif not acknowledged and not escalated and now - emergency_since >= ESCALATE_AFTER:
+        escalated = True
+        fid = active[0]
+        kind = "fire" if floors[fid]["status"] == "fire" else "quake"
+        alert(
+            f"🚨 ESCALATION: the {kind} alert has not been acknowledged for {ESCALATE_AFTER} seconds!",
+            fid, kind,
+            f"Escalated: {kind} alert not acknowledged for {ESCALATE_AFTER} seconds",
+        )
+
 
 def loop():
     while True:
@@ -196,12 +232,15 @@ def loop():
 
 
 def reset():
-    global quake_until, quake_alerted
+    global quake_until, quake_alerted, emergency_since, acknowledged, escalated
     for fid in FLOOR_IDS:
         fire_on[fid] = False
     fire_alerted.clear()
     quake_until = 0.0
     quake_alerted = False
+    emergency_since = None
+    acknowledged = False
+    escalated = False
 
 
 # ---------- The web server ----------
@@ -283,12 +322,19 @@ class Handler(BaseHTTPRequestHandler):
                     str(i): {k: floors[i][k] for k in ("name", "temperature", "smoke", "vibration", "status")}
                     for i in FLOOR_IDS
                 }
-            self.reply(200, {"floors": trimmed})
+                emergency = {
+                    "active": emergency_since is not None,
+                    "seconds": int(time.time() - emergency_since) if emergency_since is not None else 0,
+                    "acknowledged": acknowledged,
+                    "escalated": escalated,
+                    "escalate_after": ESCALATE_AFTER,
+                }
+            self.reply(200, {"floors": trimmed, "emergency": emergency})
             return
         self.reply(404, {"error": "not found"})
 
     def do_POST(self):
-        global quake_until
+        global quake_until, acknowledged
         ip = self.client_ip()
         if not self.allowed_through(ip):
             return
@@ -298,9 +344,10 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(429, {"error": "too many drills, slow down"})
             return
         parts = self.path.split("?")[0].strip("/").split("/")
+        send_ack = False
         with lock:
             if len(parts) == 3 and parts[:2] == ["control", "fire"] and parts[2] in ("0", "1", "2"):
-                fire_on[int(parts[2])] = True
+                fire_on[int(parts[2])] = True; floors[int(parts[2])]["smoke"] = 180; floors[int(parts[2])]["temperature"] = 31.0
                 message = f"fire drill started on floor {parts[2]}"
             elif parts == ["control", "quake"]:
                 quake_until = time.time() + 8
@@ -308,8 +355,15 @@ class Handler(BaseHTTPRequestHandler):
             elif parts == ["control", "reset"]:
                 reset()
                 message = "all alarms cleared"
+            elif parts == ["control", "ack"]:
+                if emergency_since is not None and not acknowledged:
+                    acknowledged = True
+                    send_ack = True
+                message = "alert acknowledged"
             else:
                 message = None
+        if send_ack:
+            telegram_only("✅ The alert was acknowledged by the operator.")
         if message is None:
             self.reply(404, {"error": "not found"})
         else:

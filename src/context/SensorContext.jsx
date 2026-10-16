@@ -22,7 +22,7 @@ export function SensorProvider({ children }) {
     { id: 2, time: '22:14:30', floor: 'Second Floor', type: 'HVAC Thermal', level: 'warning', msg: 'Ambient temp elevated at 32.4°C in Drawing Hall' },
     { id: 3, time: '22:10:15', floor: 'First Floor', type: 'Vibration Peak', level: 'info', msg: 'Concrete Compression Testing Machine operational in Lab' }
   ]);
-  const [latestPopup, setLatestPopup] = useState(null);
+  const [latestPopup, setLatestPopup] = useState(null); const [emergency, setEmergency] = useState(null);
 
   // Is the Python server running? Which status was each floor in last time?
   const serverOnline = useRef(false);
@@ -34,7 +34,7 @@ export function SensorProvider({ children }) {
       try {
         const res = await authedFetch('/data');
         const data = await res.json();
-        serverOnline.current = true;
+        serverOnline.current = true; setEmergency(data.emergency || null);
         const timestamp = new Date().toTimeString().split(' ')[0];
 
         setFloors(prev => prev.map(f => {
@@ -197,7 +197,7 @@ export function SensorProvider({ children }) {
       energyHistory,
       alerts,
       latestPopup,
-      setLatestPopup,
+      setLatestPopup, emergency,
       answerQuery
     }}>
       {children}

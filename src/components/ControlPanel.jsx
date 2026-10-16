@@ -4,15 +4,19 @@ import { useSensor } from '../context/SensorContext';
 
 const CHIP_LABELS = ['GF', '1F', '2F'];
 
-function timeLabel(iso) {
+function stamp(iso) {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? ''
-    : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function icon(a) {
+  if (String(a.message).startsWith('Escalated')) return '🚨';
+  return a.kind === 'fire' ? '🔥' : '🌍';
 }
 
 export default function ControlPanel() {
-  const { floors } = useSensor();
+  const { floors, emergency } = useSensor();
   const [open, setOpen] = useState(false);
   const [history, setHistory] = useState([]);
   const [note, setNote] = useState('');
@@ -34,15 +38,23 @@ export default function ControlPanel() {
       .from('alerts')
       .select('id, floor_id, kind, message, created_at')
       .order('created_at', { ascending: false })
-      .limit(6);
+      .limit(20);
     if (!error && data) setHistory(data);
   }, []);
 
+  // Refresh every 5 seconds
   useEffect(() => {
     loadHistory();
     const timer = setInterval(loadHistory, 5000);
     return () => clearInterval(timer);
   }, [loadHistory]);
+
+  // Refresh soon after anything changes (the server saves alerts a moment after detecting them)
+  const changeKey = `${quake}|${fireNames.join(',')}|${emergency ? emergency.escalated : ''}`;
+  useEffect(() => {
+    const t = setTimeout(loadHistory, 2500);
+    return () => clearTimeout(t);
+  }, [changeKey, loadHistory]);
 
   const run = async (path) => {
     if (busy) return;
@@ -61,7 +73,6 @@ export default function ControlPanel() {
       setNote('Server not reachable.');
     }
     setBusy(false);
-    setTimeout(loadHistory, 4000);
   };
 
   const glass = 'border border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl';
@@ -82,7 +93,7 @@ export default function ControlPanel() {
       </div>
 
       {/* Control panel */}
-      <div className={`rise fixed right-[316px] top-20 z-40 w-72 max-h-[70vh] overflow-y-auto rounded-3xl p-4 ${glass}`}>
+      <div className={`rise fixed right-[316px] top-20 z-40 max-h-[75vh] w-72 overflow-y-auto rounded-3xl p-4 ${glass}`}>
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-white">Control panel</p>
           <div className="flex gap-2">
@@ -114,15 +125,17 @@ export default function ControlPanel() {
             </div>
 
             <div>
-              <p className="mb-1 text-[11px] uppercase tracking-widest text-slate-400">Alert history</p>
+              <p className="mb-1 text-[11px] uppercase tracking-widest text-slate-400">
+                Alert history <span className="normal-case tracking-normal text-slate-500">(latest 20)</span>
+              </p>
               {history.length === 0 ? (
                 <p className="text-xs text-slate-500">No alerts yet.</p>
               ) : (
-                <ul className="space-y-1">
+                <ul className="max-h-44 space-y-2 overflow-y-auto pr-1">
                   {history.map((a) => (
-                    <li key={a.id} className="flex items-start justify-between gap-2 text-xs text-slate-300">
-                      <span>{a.kind === 'fire' ? '🔥' : '🌍'} {a.message}</span>
-                      <span className="shrink-0 text-slate-500">{timeLabel(a.created_at)}</span>
+                    <li key={a.id} className="text-xs text-slate-300">
+                      <div>{icon(a)} {a.message}</div>
+                      <div className="text-[10px] text-slate-500">{stamp(a.created_at)}</div>
                     </li>
                   ))}
                 </ul>

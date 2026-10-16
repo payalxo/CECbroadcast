@@ -5,7 +5,7 @@ import Navbar from './components/Navbar';
 import LeftSidebar from './components/LeftSidebar';
 import CenterView from './components/CenterView';
 import RightSidebar from './components/RightSidebar';
-import ControlPanel from './components/ControlPanel';
+import ControlPanel from './components/ControlPanel'; import EmergencyOverlay from './components/EmergencyOverlay';
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -22,7 +22,7 @@ export default function App() {
         )}
 
         {/* Status banner, drill buttons, alert history */}
-        {!isLoading && <ControlPanel />}
+        {!isLoading && <ControlPanel />}{!isLoading && <EmergencyOverlay />}
 
         {/* Main Dashboard Layout */}
         <div className={`w-full h-full flex flex-col transition-opacity duration-700 ${isLoading ? 'opacity-0' : 'opacity-100'}`}>
