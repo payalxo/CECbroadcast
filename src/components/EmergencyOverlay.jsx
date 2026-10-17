@@ -4,7 +4,7 @@ import { useSensor } from '../context/SensorContext';
 
 const FIRE_STEPS = [
   'Leave the floor now by the nearest exit.',
-  'Use the stairs. Do not stop for belongings.',
+  'Do not use the lift.',
   'Stay low if there is smoke.',
   'Go to the assembly point and wait for the all-clear.',
   'Call the fire service (101) or 112.',
@@ -16,6 +16,49 @@ const QUAKE_STEPS = [
   'Do not run outside while the shaking continues.',
   'When it stops, leave carefully by the stairs.',
 ];
+
+// Runs start() in only ONE open tab at a time, so two tabs never play two sirens.
+// start() must return a function that stops whatever it started.
+function runInOneTab(name, start) {
+  let release = null;
+  let stopFn = null;
+  let stopped = false;
+  const controller = new AbortController();
+
+  const begin = () => {
+    stopFn = start();
+  };
+
+  if (navigator.locks && navigator.locks.request) {
+    navigator.locks
+      .request(name, { signal: controller.signal }, () =>
+        new Promise((resolve) => {
+          if (stopped) {
+            resolve();
+            return;
+          }
+          release = resolve;
+          begin();
+        })
+      )
+      .catch(() => {});
+  } else {
+    begin();
+  }
+
+  return () => {
+    stopped = true;
+    controller.abort();
+    if (stopFn) {
+      try {
+        stopFn();
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    if (release) release();
+  };
+}
 
 export default function EmergencyOverlay() {
   const { floors, emergency } = useSensor();
@@ -51,41 +94,37 @@ export default function EmergencyOverlay() {
     return () => clearTimeout(t);
   }, [acked]);
 
-  // Siren, made in the browser (no sound files)
+  // Siren and spoken announcement: one voice, in one tab only
   useEffect(() => {
     if (!loud) return undefined;
-    let ctx;
-    let timer;
-    const oscillators = [];
-    try {
-      ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const master = ctx.createGain();
-      master.gain.value = 0.12;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 2400;
-      filter.connect(master);
-      master.connect(ctx.destination);
 
-      const voices = [
-        { type: 'sawtooth', detune: 0, level: 0.6 },
-        { type: 'square', detune: 7, level: 0.25 },
-      ].map((v) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = v.type;
-        osc.detune.value = v.detune;
-        gain.gain.value = v.level;
-        osc.connect(gain);
-        gain.connect(filter);
+    const announcement =
+      kind === 'fire'
+        ? `Fire detected on ${fireFloors.join(' and ')}. Leave by the nearest exit. Do not use the lift.`
+        : 'Earthquake detected. Drop, cover, and hold on.';
+
+    return runInOneTab('campus-twin-alarm', () => {
+      let ctx;
+      let osc;
+      let timer;
+      try {
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const master = ctx.createGain();
+        master.gain.value = 0.12;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 2200;
+        osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.connect(filter);
+        filter.connect(master);
+        master.connect(ctx.destination);
         osc.start();
-        oscillators.push(osc);
-        return osc;
-      });
 
-      const cycle = () => {
-        const t = ctx.currentTime;
-        voices.forEach((osc) => {
+        const cycle = () => {
+          const t = ctx.currentTime;
           osc.frequency.cancelScheduledValues(t);
           if (kind === 'fire') {
             // smooth wail: low, up, down
@@ -97,41 +136,34 @@ export default function EmergencyOverlay() {
             osc.frequency.setValueAtTime(880, t);
             osc.frequency.setValueAtTime(660, t + 0.35);
           }
-        });
-      };
-      cycle();
-      timer = setInterval(cycle, kind === 'fire' ? 1400 : 700);
-    } catch (e) {
-      /* sound is optional */
-    }
-    return () => {
-      clearInterval(timer);
-      oscillators.forEach((o) => {
+        };
+        cycle();
+        timer = setInterval(cycle, kind === 'fire' ? 1400 : 700);
+      } catch (e) {
+        /* sound is optional */
+      }
+
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(announcement));
+      }
+
+      return () => {
+        clearInterval(timer);
         try {
-          o.stop();
+          if (osc) osc.stop();
         } catch (e) {
           /* ignore */
         }
-      });
-      try {
-        if (ctx) ctx.close();
-      } catch (e) {
-        /* ignore */
-      }
-    };
+        try {
+          if (ctx) ctx.close();
+        } catch (e) {
+          /* ignore */
+        }
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      };
+    });
   }, [loud, kind]);
-
-  // Spoken announcement
-  useEffect(() => {
-    if (!active || acked || muted || !('speechSynthesis' in window)) return undefined;
-    const text =
-      kind === 'fire'
-        ? `Fire detected on ${fireFloors.join(' and ')}. Use the stairs and leave by the nearest exit.`
-        : 'Earthquake detected. Drop, cover, and hold on.';
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
-    return () => window.speechSynthesis.cancel();
-  }, [active, kind, acked, muted]);
 
   const call = async (path, failText) => {
     if (busy) return;
