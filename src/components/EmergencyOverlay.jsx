@@ -61,7 +61,7 @@ function runInOneTab(name, start) {
 }
 
 export default function EmergencyOverlay() {
-  const { floors, emergency } = useSensor();
+  const { floors, emergency, role } = useSensor();
   const [muted, setMuted] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -234,7 +234,7 @@ export default function EmergencyOverlay() {
           <div className="mt-4 flex flex-wrap gap-2">
             {!acked && (
               <button
-                onClick={() => call('/control/ack', 'Could not acknowledge. Try again.')}
+                onClick={() => call('/control/ack', 'Could not acknowledge. Try again.')} hidden={role !== 'operator'}
                 disabled={busy}
                 className={`lift rounded-xl px-3 py-2 text-xs font-bold text-black disabled:opacity-40 ${theme.btn}`}
               >
@@ -243,7 +243,7 @@ export default function EmergencyOverlay() {
             )}
             {acked && (
               <button
-                onClick={() => call('/control/reset', 'Could not clear the drill. Try again.')}
+                onClick={() => call('/control/reset', 'Could not clear the drill. Try again.')} hidden={role !== 'operator'}
                 disabled={busy}
                 className="lift rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-bold disabled:opacity-40"
               >

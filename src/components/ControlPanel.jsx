@@ -16,7 +16,7 @@ function icon(a) {
 }
 
 export default function ControlPanel() {
-  const { floors, emergency } = useSensor();
+  const { floors, emergency, role } = useSensor();
   const [open, setOpen] = useState(false);
   const [history, setHistory] = useState([]);
   const [note, setNote] = useState('');
@@ -113,8 +113,8 @@ export default function ControlPanel() {
             </div>
 
             <div>
-              <p className="mb-1 text-[11px] uppercase tracking-widest text-slate-400">Simulate (drill)</p>
-              <div className="grid grid-cols-3 gap-2">
+              <p className="mb-1 text-[11px] uppercase tracking-widest text-slate-400">{role === 'operator' ? 'Simulate (drill)' : 'View-only account (drills are for operators)'}</p>
+              <div className={role === 'operator' ? 'grid grid-cols-3 gap-2' : 'hidden'}>
                 <button className={btn} disabled={busy} onClick={() => run('/control/fire/0')}>🔥 GF</button>
                 <button className={btn} disabled={busy} onClick={() => run('/control/fire/1')}>🔥 1F</button>
                 <button className={btn} disabled={busy} onClick={() => run('/control/fire/2')}>🔥 2F</button>

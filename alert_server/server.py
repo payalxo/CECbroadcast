@@ -63,40 +63,47 @@ class RateLimiter:
             self._prune(key, time.time()).append(time.time())
 
 
-general_limiter = RateLimiter(int(os.environ.get("RATE_LIMIT_PER_MIN", "600")), 60)   # any request: 120 per minute per address
+general_limiter = RateLimiter(int(os.environ.get("RATE_LIMIT_PER_MIN", "600")), 60)
 control_limiter = RateLimiter(10, 60)    # drills: 10 per minute per address
 failed_logins = RateLimiter(10, 300)     # bad logins: 10 per 5 minutes per address
 
 
-# ---------- Login check (done on the server, by asking Supabase) ----------
-token_cache = {}
+# ---------- Login check and role (done on the server, by asking Supabase) ----------
+token_cache = {}   # token -> (expires_at, role)
 cache_lock = threading.Lock()
 
 
-def token_is_valid(token):
+def get_role(token):
+    """Returns 'operator', 'viewer', or None when the token is not valid."""
     if not token or len(token) > 4096 or not set(token) <= TOKEN_CHARS:
-        return False
+        return None
     now = time.time()
     with cache_lock:
-        if token_cache.get(token, 0) > now:
-            return True
+        hit = token_cache.get(token)
+        if hit and hit[0] > now:
+            return hit[1]
     if not SUPABASE_URL or not PUBLISHABLE_KEY:
-        return False
+        return None
     request = urllib.request.Request(
         f"{SUPABASE_URL}/auth/v1/user",
         headers={"apikey": PUBLISHABLE_KEY, "Authorization": f"Bearer {token}"},
     )
     try:
         with urllib.request.urlopen(request, timeout=8) as response:
-            ok = response.status == 200
+            if response.status != 200:
+                return None
+            user = json.loads(response.read().decode("utf-8", errors="ignore"))
     except Exception:
-        ok = False
-    if ok:
-        with cache_lock:
-            if len(token_cache) > 500:
-                token_cache.clear()
-            token_cache[token] = now + 30   # remember a good token for 30 seconds
-    return ok
+        return None
+    if not isinstance(user, dict):
+        return None
+    meta = user.get("app_metadata") or {}
+    role = "operator" if isinstance(meta, dict) and meta.get("role") == "operator" else "viewer"
+    with cache_lock:
+        if len(token_cache) > 500:
+            token_cache.clear()
+        token_cache[token] = (now + 30, role)   # remember a good token for 30 seconds
+    return role
 
 
 # ---------- Saving alerts to the database ----------
@@ -252,8 +259,10 @@ class Handler(BaseHTTPRequestHandler):
     def client_ip(self):
         if TRUST_PROXY:
             forwarded = self.headers.get("X-Forwarded-For", "")
-            if forwarded:
-                return ([p.strip() for p in forwarded.split(",") if p.strip()] or [self.client_address[0]])[-2:][0]
+            parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+            if parts:
+                # behind Render's proxy the real client is the entry before the proxy's own
+                return parts[-2] if len(parts) >= 2 else parts[0]
         return self.client_address[0]
 
     def safe_headers(self):
@@ -289,17 +298,19 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return True
 
-    def logged_in(self, ip):
+    def current_role(self, ip):
+        """Returns 'operator' or 'viewer'. If not signed in, sends the error reply and returns None."""
         if failed_logins.blocked(ip):
             self.reply(429, {"error": "too many failed attempts, try later"})
-            return False
+            return None
         header = self.headers.get("Authorization", "")
         token = header[7:].strip() if header.startswith("Bearer ") else ""
-        if not token_is_valid(token):
+        role = get_role(token)
+        if role is None:
             failed_logins.hit(ip)
             self.reply(401, {"error": "unauthorized"})
-            return False
-        return True
+            return None
+        return role
 
     def do_OPTIONS(self):
         self.send_response(204)
@@ -315,7 +326,8 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200, {"status": "ok"})
             return
         if path == "data":
-            if not self.logged_in(ip):
+            role = self.current_role(ip)
+            if role is None:
                 return
             with lock:
                 trimmed = {
@@ -329,7 +341,7 @@ class Handler(BaseHTTPRequestHandler):
                     "escalated": escalated,
                     "escalate_after": ESCALATE_AFTER,
                 }
-            self.reply(200, {"floors": trimmed, "emergency": emergency})
+            self.reply(200, {"floors": trimmed, "emergency": emergency, "role": role})
             return
         self.reply(404, {"error": "not found"})
 
@@ -338,7 +350,11 @@ class Handler(BaseHTTPRequestHandler):
         ip = self.client_ip()
         if not self.allowed_through(ip):
             return
-        if not self.logged_in(ip):
+        role = self.current_role(ip)
+        if role is None:
+            return
+        if role != "operator":
+            self.reply(403, {"error": "operators only"})
             return
         if not control_limiter.allow(ip):
             self.reply(429, {"error": "too many drills, slow down"})
