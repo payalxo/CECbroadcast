@@ -22,7 +22,7 @@ export function SensorProvider({ children }) {
     { id: 2, time: '22:14:30', floor: 'Second Floor', type: 'HVAC Thermal', level: 'warning', msg: 'Ambient temp elevated at 32.4°C in Drawing Hall' },
     { id: 3, time: '22:10:15', floor: 'First Floor', type: 'Vibration Peak', level: 'info', msg: 'Concrete Compression Testing Machine operational in Lab' }
   ]);
-  const [latestPopup, setLatestPopup] = useState(null); const [emergency, setEmergency] = useState(null);
+  const [latestPopup, setLatestPopup] = useState(null); const [emergency, setEmergency] = useState(null); const [serverStatus, setServerStatus] = useState('connecting');
 
   // Is the Python server running? Which status was each floor in last time?
   const serverOnline = useRef(false);
@@ -34,7 +34,7 @@ export function SensorProvider({ children }) {
       try {
         const res = await authedFetch('/data');
         const data = await res.json();
-        serverOnline.current = true; setEmergency(data.emergency || null);
+        serverOnline.current = true; setServerStatus('online'); setEmergency(data.emergency || null);
         const timestamp = new Date().toTimeString().split(' ')[0];
 
         setFloors(prev => prev.map(f => {
@@ -65,7 +65,7 @@ export function SensorProvider({ children }) {
           });
         }
       } catch (e) {
-        serverOnline.current = false;
+        serverOnline.current = false; setServerStatus('offline');
       }
     };
 
@@ -77,7 +77,7 @@ export function SensorProvider({ children }) {
   // Fake sensor ticker every 2500ms (only used when the Python server is NOT running)
   useEffect(() => {
     const interval = setInterval(() => {
-      if (serverOnline.current) return;
+      return; // demo data disabled
 
       const timestamp = new Date().toTimeString().split(' ')[0];
 
@@ -197,7 +197,7 @@ export function SensorProvider({ children }) {
       energyHistory,
       alerts,
       latestPopup,
-      setLatestPopup, emergency,
+      setLatestPopup, emergency, serverStatus,
       answerQuery
     }}>
       {children}
