@@ -344,7 +344,7 @@ export default function BuildingModel({ cameraPreset, isPaused }) {
           enablePan={true}
           enableZoom={true}
           minDistance={12}
-          maxDistance={70}
+          maxDistance={120}
           maxPolarAngle={Math.PI / 2 - 0.05} // Don't go below ground
           target={[0, 2, 0]}
         />

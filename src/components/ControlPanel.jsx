@@ -3,7 +3,6 @@ import { supabase, authedFetch } from '../lib/api';
 import { useSensor } from '../context/SensorContext';
 
 const CHIP_LABELS = ['GF', '1F', '2F'];
-
 function stamp(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
@@ -67,7 +66,7 @@ export default function ControlPanel() {
       else if (!res.ok) setNote('Could not start the drill.');
       else {
         const body = await res.json();
-        setNote(body.message || 'Done.');
+        setNote(body.message || 'Done.'); if (window.innerWidth < 1024) setOpen(false);
       }
     } catch {
       setNote('Server not reachable.');
@@ -85,7 +84,7 @@ export default function ControlPanel() {
   return (
     <>
       {/* Status banner */}
-      <div className="pointer-events-none fixed left-1/2 top-16 z-40 -translate-x-1/2">
+      <div className="pointer-events-none fixed left-1/2 top-[126px] z-40 -translate-x-1/2 lg:top-16">
         <div className={`flex items-center gap-2 rounded-full border px-5 py-2 text-xs font-semibold tracking-widest backdrop-blur-xl transition-all duration-500 ${banner.tone}`}>
           <span className={`h-2 w-2 rounded-full ${banner.dot}`} />
           {banner.text}
@@ -93,7 +92,7 @@ export default function ControlPanel() {
       </div>
 
       {/* Control panel */}
-      <div className={`rise fixed right-[316px] top-20 z-40 max-h-[75vh] w-72 overflow-y-auto rounded-3xl p-4 ${glass}`}>
+      <div className={`rise fixed left-2 right-2 top-[170px] z-40 max-h-[50dvh] overflow-y-auto lg:left-auto lg:right-[316px] lg:top-20 lg:max-h-[75vh] lg:w-72 rounded-3xl p-4 ${glass}`}>
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-white">Control panel</p>
           <div className="flex gap-2">

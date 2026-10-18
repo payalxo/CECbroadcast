@@ -200,7 +200,7 @@ export default function EmergencyOverlay() {
       {collapsed ? (
         <button
           onClick={() => setCollapsed(false)}
-          className={`rise lift fixed left-[236px] top-[130px] z-50 flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold backdrop-blur-xl ${theme.chip}`}
+          className={`rise lift fixed bottom-[72px] left-2 z-50 flex items-center gap-2 lg:bottom-auto lg:left-[236px] lg:top-[130px] rounded-full border px-4 py-2 text-xs font-bold backdrop-blur-xl ${theme.chip}`}
         >
           <span className={`h-2 w-2 rounded-full bg-current ${acked ? '' : 'animate-pulse'}`} />
           {title}
@@ -210,7 +210,7 @@ export default function EmergencyOverlay() {
         <div
           role="alert"
           aria-live="assertive"
-          className={`rise fixed left-[236px] top-[130px] z-50 max-h-[calc(100vh-170px)] w-80 overflow-y-auto rounded-2xl border p-4 text-white shadow-2xl backdrop-blur-xl ${theme.card}`}
+          className={`rise fixed bottom-16 left-2 right-2 z-50 max-h-[55dvh] overflow-y-auto lg:bottom-auto lg:left-[236px] lg:right-auto lg:top-[130] lg:max-h-[calc(100vh-170px)] lg:w-80 rounded-2xl border p-4 text-white shadow-2xl backdrop-blur-xl ${theme.card}`}
         >
           <div className="flex items-start justify-between gap-2">
             <p className={`text-base font-extrabold tracking-wide ${theme.title}`}>{title}</p>

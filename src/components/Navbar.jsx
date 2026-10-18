@@ -16,23 +16,23 @@ export default function Navbar() {
   }, []);
 
   return (
-    <header className="z-50 flex h-[56px] w-full select-none items-center justify-between border-b border-white/10 bg-[#070d1a]/80 px-4 backdrop-blur-xl">
+    <header className="z-50 flex h-[56px] w-full shrink-0 select-none items-center justify-between gap-2 border-b border-white/10 bg-[#070d1a]/80 px-3 backdrop-blur-xl sm:px-4">
       {/* LEFT: Branding */}
-      <div className="flex items-center space-x-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-cyan-500 to-violet-500 p-0.5 shadow-[0_0_18px_rgba(34,211,238,0.35)]">
+      <div className="flex min-w-0 items-center space-x-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-cyan-500 to-violet-500 p-0.5 shadow-[0_0_18px_rgba(34,211,238,0.35)]">
           <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-[#040810]">
             <Layers className="h-5 w-5 text-cyan-400" />
           </div>
         </div>
-        <div>
-          <h1 className="text-sm font-bold tracking-wide text-white">
+        <div className="min-w-0">
+          <h1 className="truncate text-sm font-bold tracking-wide text-white">
             CEC Civil Dept <span className="gradient-text">· Campus Twin</span>
           </h1>
-          <p className="text-[10px] text-slate-400">Chaibasa Engineering College · JUT Ranchi</p>
+          <p className="hidden truncate text-[10px] text-slate-400 sm:block">Chaibasa Engineering College · JUT Ranchi</p>
         </div>
       </div>
 
-      {/* CENTER: Status chips */}
+      {/* CENTER: Status chips (large screens) */}
       <div className="hidden items-center space-x-3 lg:flex">
         <div className="flex items-center space-x-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1">
           <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
@@ -58,9 +58,15 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* RIGHT: What this app does */}
-      <div className="flex items-center">
-        <div className="flex items-center space-x-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-cyan-300">
+      {/* RIGHT */}
+      <div className="flex shrink-0 items-center">
+        {/* phones: short label */}
+        <div className="flex items-center space-x-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 sm:hidden">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+          <span className="text-[10px] font-bold tracking-wider text-amber-300">SIMULATED</span>
+        </div>
+        {/* tablets and up */}
+        <div className="hidden items-center space-x-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-cyan-300 sm:flex">
           <ShieldCheck className="h-4 w-4 text-emerald-400" />
           <span className="text-[11px] font-medium text-white">Fire &amp; Earthquake Monitoring</span>
         </div>

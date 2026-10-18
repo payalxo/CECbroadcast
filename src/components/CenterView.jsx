@@ -72,15 +72,15 @@ export default function CenterView() {
         <div className="flex items-center space-x-1 rounded-2xl border border-white/10 bg-white/5 p-1 shadow-lg backdrop-blur-xl">
           <button onClick={() => setCameraPreset(0)} className={tab(cameraPreset === 0)}>
             <Compass className="h-3.5 w-3.5" />
-            <span>3D View</span>
+            <span className="sm:hidden">3D</span><span className="hidden sm:inline">3D View</span>
           </button>
           <button onClick={() => setCameraPreset(1)} className={tab(cameraPreset === 1)}>
             <Layers className="h-3.5 w-3.5" />
-            <span>Floor Plan</span>
+            <span className="sm:hidden">Plan</span><span className="hidden sm:inline">Floor Plan</span>
           </button>
           <button onClick={() => setCameraPreset(2)} className={tab(cameraPreset === 2)}>
             <Eye className="h-3.5 w-3.5" />
-            <span>Front Elevation</span>
+            <span className="sm:hidden">Front</span><span className="hidden sm:inline">Front Elevation</span>
           </button>
           <button
             onClick={() => setIsPaused(!isPaused)}
