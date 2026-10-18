@@ -117,3 +117,29 @@ body { font-family: ui-sans-serif, system-ui, 'Segoe UI', sans-serif; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+/* Emergency card on large screens: below the top bar, above everything else */
+@media (min-width: 1024px) {
+  div[role="alert"].rise {
+    top: 130px !important;
+    bottom: auto !important;
+    left: 236px !important;
+    right: auto !important;
+    width: 320px !important;
+    max-height: calc(100vh - 170px) !important;
+    z-index: 60 !important;
+  }
+  button.rise.lift.fixed {
+    top: 130px !important;
+    bottom: auto !important;
+    left: 236px !important;
+    z-index: 60 !important;
+  }
+}
+/* Collapsed emergency pill on phones: top of the 3D view, not on top of the Ask bar */
+@media (max-width: 1023px) {
+  button.rise.lift.fixed {
+    top: 148px !important;
+    bottom: auto !important;
+    left: 12px !important;
+  }
+}

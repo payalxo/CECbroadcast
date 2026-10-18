@@ -117,7 +117,7 @@ export default function CenterView() {
 
       {/* ALERT POPUP (BOTTOM-CENTER) */}
       {latestPopup && (
-        <div className="rise absolute bottom-20 left-1/2 z-30 w-full max-w-md -translate-x-1/2 px-4">
+        <div className="rise absolute inset-x-0 bottom-20 z-30 mx-auto w-full max-w-md px-4">
           <div className="flex items-start space-x-3 rounded-2xl border border-rose-500/50 bg-rose-950/80 p-3.5 text-white shadow-[0_0_30px_rgba(255,51,85,0.4)] backdrop-blur-xl">
             <AlertOctagon className="mt-0.5 h-6 w-6 shrink-0 animate-pulse text-rose-400" />
             <div className="flex-1">
@@ -135,7 +135,7 @@ export default function CenterView() {
       )}
 
       {/* ASK THE BUILDING (BOTTOM-RIGHT) */}
-      <div className="absolute bottom-4 left-4 right-4 z-20 w-full max-w-lg sm:left-auto">
+      <div className="absolute bottom-4 left-4 right-4 z-20 max-w-lg sm:left-auto sm:w-full">
         {aiResponse && (
           <div className="rise relative mb-2 rounded-2xl border border-white/10 bg-white/5 p-3.5 text-xs text-slate-200 shadow-xl backdrop-blur-xl">
             <button onClick={() => setAiResponse(null)} aria-label="Close answer" className="absolute right-2 top-2 text-slate-400 hover:text-white">
