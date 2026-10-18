@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { authedFetch } from '../lib/api';
-import { useSensor } from '../context/SensorContext';
+import { useSensor } from '../context/SensorContext'; import { PeopleSummary } from './PeoplePanel';
 
 const FIRE_STEPS = [
   'Leave the floor now by the nearest exit.',
@@ -223,7 +223,7 @@ export default function EmergencyOverlay() {
             </button>
           </div>
           <p className="mt-0.5 text-[10px] text-slate-300">Demo announcement. This app does not contact emergency services.</p>
-          <p className="mt-2 text-[11px] font-semibold text-slate-100">{statusLine}</p>
+          <p className="mt-2 text-[11px] font-semibold text-slate-100">{statusLine}</p><PeopleSummary />
 
           <ol className="mt-3 list-decimal space-y-1 pl-5 text-xs text-slate-100">
             {steps.map((s) => (

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSensor } from '../context/SensorContext';
 import { Thermometer, Wind, Activity, ShieldCheck, AlertTriangle, Clock } from 'lucide-react';
-import TrendChart from './TrendChart';
+import TrendChart from './TrendChart'; import PeoplePanel from './PeoplePanel';
 const CODES = ['GF', '1F', '2F'];
 
 const statusInfo = (s) =>
@@ -148,7 +148,7 @@ export default function RightSidebar() {
         )}
       </div>
 
-      <TrendChart />{/* PANEL 3: How detection works */}
+      <PeoplePanel /><TrendChart />{/* PANEL 3: How detection works */}
       <div className={panel}>
         <h2 className={`${heading} mb-2`}>
           <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />

@@ -162,6 +162,70 @@ acknowledged = False
 escalated = False
 
 
+# ---------- Simulated headcount (counts only, no names) ----------
+BASE_PEOPLE = {0: 10, 1: 18, 2: 26}
+people = {i: {"inside": BASE_PEOPLE[i], "stuck": 0, "cleared": False} for i in FLOOR_IDS}
+evacuating = False
+
+
+def people_step(any_emergency):
+    global evacuating
+    if any_emergency and not evacuating:
+        # An emergency just started. At least one floor keeps a few people who do not get out on their own.
+        evacuating = True
+        trapped_floor = random.choice(FLOOR_IDS)
+        for fid in FLOOR_IDS:
+            p = people[fid]
+            p["cleared"] = False
+            wanted = random.randint(1, 3) if fid == trapped_floor else random.choice([0, 0, 1])
+            p["stuck"] = min(p["inside"], wanted)
+    elif not any_emergency and evacuating:
+        evacuating = False
+        for fid in FLOOR_IDS:
+            people[fid]["stuck"] = 0
+            people[fid]["cleared"] = False
+
+    for fid in FLOOR_IDS:
+        p = people[fid]
+        if evacuating:
+            if p["inside"] > p["stuck"]:
+                p["inside"] = max(p["stuck"], p["inside"] - random.randint(1, 3))
+        else:
+            base = BASE_PEOPLE[fid]
+            if p["inside"] < base - 3:
+                p["inside"] = min(base, p["inside"] + 2)   # people come back after an all-clear
+            elif random.random() < 0.3:
+                p["inside"] = max(base - 3, min(base + 3, p["inside"] + random.choice([-1, 0, 1])))
+
+
+def people_snapshot():
+    out = {}
+    for fid in FLOOR_IDS:
+        p = people[fid]
+        out[str(fid)] = {
+            "inside": p["inside"],
+            "base": BASE_PEOPLE[fid],
+            "settled": evacuating and p["inside"] <= p["stuck"],
+            "cleared": p["cleared"],
+        }
+    return {"floors": out, "evacuating": evacuating}
+
+
+def clear_floor(fid):
+    p = people[fid]
+    p["inside"] = 0
+    p["stuck"] = 0
+    p["cleared"] = True
+
+
+def people_reset():
+    global evacuating
+    evacuating = False
+    for fid in FLOOR_IDS:
+        people[fid]["stuck"] = 0
+        people[fid]["cleared"] = False
+
+
 def tick():
     global quake_alerted, emergency_since, acknowledged, escalated
     quake_on = time.time() < quake_until
@@ -209,6 +273,9 @@ def tick():
         else:
             f["status"] = "ok"
 
+    # --- simulated headcount ---
+    people_step(any(floors[i]["status"] != "ok" for i in FLOOR_IDS))
+
     # --- emergency tracking and escalation ---
     active = [fid for fid in FLOOR_IDS if floors[fid]["status"] != "ok"]
     now = time.time()
@@ -224,8 +291,10 @@ def tick():
         escalated = True
         fid = active[0]
         kind = "fire" if floors[fid]["status"] == "fire" else "quake"
+        inside_now = sum(people[i]["inside"] for i in FLOOR_IDS)
         alert(
-            f"🚨 ESCALATION: the {kind} alert has not been acknowledged for {ESCALATE_AFTER} seconds!",
+            f"🚨 ESCALATION: the {kind} alert has not been acknowledged for {ESCALATE_AFTER} seconds! "
+            f"People still inside (simulated): {inside_now}",
             fid, kind,
             f"Escalated: {kind} alert not acknowledged for {ESCALATE_AFTER} seconds",
         )
@@ -248,6 +317,7 @@ def reset():
     emergency_since = None
     acknowledged = False
     escalated = False
+    people_reset()
 
 
 # ---------- The web server ----------
@@ -340,6 +410,7 @@ class Handler(BaseHTTPRequestHandler):
                     "acknowledged": acknowledged,
                     "escalated": escalated,
                     "escalate_after": ESCALATE_AFTER,
+                    "people": people_snapshot(),
                 }
             self.reply(200, {"floors": trimmed, "emergency": emergency, "role": role})
             return
@@ -361,16 +432,24 @@ class Handler(BaseHTTPRequestHandler):
             return
         parts = self.path.split("?")[0].strip("/").split("/")
         send_ack = False
+        cleared_floor = None
         with lock:
             if len(parts) == 3 and parts[:2] == ["control", "fire"] and parts[2] in ("0", "1", "2"):
                 fire_on[int(parts[2])] = True; floors[int(parts[2])]["smoke"] = 180; floors[int(parts[2])]["temperature"] = 31.0
                 message = f"fire drill started on floor {parts[2]}"
             elif parts == ["control", "quake"]:
-                quake_until = time.time() + 15
-                message = "earthquake drill started (15 seconds)"
+                quake_until = time.time() + 25
+                message = "earthquake drill started (25 seconds)"
             elif parts == ["control", "reset"]:
                 reset()
                 message = "all alarms cleared"
+            elif len(parts) == 3 and parts[:2] == ["control", "clear"] and parts[2] in ("0", "1", "2"):
+                if evacuating:
+                    clear_floor(int(parts[2]))
+                    cleared_floor = int(parts[2])
+                    message = f"{NAMES[cleared_floor]} marked as cleared"
+                else:
+                    message = "no emergency is active"
             elif parts == ["control", "ack"]:
                 if emergency_since is not None and not acknowledged:
                     acknowledged = True
@@ -380,6 +459,8 @@ class Handler(BaseHTTPRequestHandler):
                 message = None
         if send_ack:
             telegram_only("✅ The alert was acknowledged by the operator.")
+        if cleared_floor is not None:
+            telegram_only(f"✅ {NAMES[cleared_floor]} marked as cleared by the operator.")
         if message is None:
             self.reply(404, {"error": "not found"})
         else:
